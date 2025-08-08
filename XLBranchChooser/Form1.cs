@@ -108,47 +108,55 @@ namespace XLBranchChooser
         }
         async private void grabBranches()
         {
-            string linktoyaml = "https://raw.githubusercontent.com/goatcorp/dalamud-declarative/refs/heads/main/config.yaml";
+            string linktojson = "https://kamori.goats.dev/Dalamud/Release/Meta";
             using (HttpClient client = new HttpClient())
             {
                 try
                 {
                     // Fetch the content from the URL
-                    string content = await client.GetStringAsync(linktoyaml);
+                    string content = await client.GetStringAsync(linktojson);
 
 
-                    // Configure the deserializer
-                    var deserializer = new DeserializerBuilder()
-                        .WithNamingConvention(CamelCaseNamingConvention.Instance)
-                        .Build();
 
                     // Deserialize the YAML into the root object
-                    var tracksData = deserializer.Deserialize<TrackRoot>(content);
+                    dynamic tracksData = JsonConvert.DeserializeObject(content);
+
+                    if (tracksData == null)
+                        throw new Exception(tracksData);
 
                     // Output the deserialized data
                     int y = 20; // Initial vertical position
 
 
-                    
 
 
 
-                    foreach (var track in tracksData.Tracks)
+
+                    foreach (var track in tracksData)
                     {
+                        string name = track.Value["track"];
+                        if (name == null)
+                            continue;
+                        bool isCompatible = (track.Value["isApplicableForCurrentGameVer"] ?? true);
 
 
-                        var isCompatible = (track.Value.ApplicableGameVersion == GameVersion);
 
-                        //    Console.WriteLine($"Track Name: {track.Key}");
-                        //    Console.WriteLine($"Applicable Game Version: {track.Value.Key}");
+                        string key = track.Value["key"] ?? "";
+
                         var radioButton = new RadioButton
                         {
-                            Text = track.Key,
-                            Tag = track.Value.Key, // Store value in Tag property
+                            Text = name,
+                            Tag = key, // Store key in Tag property because thats easy
                             Location = new System.Drawing.Point(10, y),
                             AutoSize = true,
-                            Enabled = isCompatible
+                            Enabled = isCompatible,
+                            BackColor = isCompatible ? Control.DefaultBackColor : Color.LightGray,
                         };
+                        
+                        if (name == "release" && !isCompatible)
+                        {
+                            radioButton.Enabled = true;
+                        }
 
                         radioButton.CheckedChanged += RadioButton_CheckedChanged;
 
