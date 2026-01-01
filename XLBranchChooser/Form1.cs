@@ -31,14 +31,13 @@ namespace XLBranchChooser
         {
             InitializeComponent();
         }
-        public static string jsonPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\XIVLauncher\dalamudConfig.json";
         public static string exePath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\XIVLauncher\addon\Hooks\dev\Dalamud.Injector.exe";
         public static string launcherjsonPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\XIVLauncher\launcherConfigV3.json";
         public static string GameVersion = "";
 
         public JObject LoadJson()
         {
-            using (StreamReader r = new StreamReader(jsonPath))
+            using (StreamReader r = new StreamReader(launcherjsonPath))
             {
                 string jsonContent = r.ReadToEnd();
                 return JObject.Parse(jsonContent);
@@ -46,7 +45,7 @@ namespace XLBranchChooser
         }
         public void SaveJson(JObject jsonObject)
         {
-            File.WriteAllText(jsonPath, jsonObject.ToString());
+            File.WriteAllText(launcherjsonPath, jsonObject.ToString());
 
         }
 
