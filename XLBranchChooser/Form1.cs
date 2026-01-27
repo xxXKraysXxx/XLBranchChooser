@@ -8,6 +8,7 @@ using System.Security.Policy;
 using System.Text.Json.Nodes;
 using YamlDotNet.Serialization.NamingConventions;
 using System.Diagnostics;
+using Microsoft.Win32;
 
 namespace XLBranchChooser
 {
@@ -31,7 +32,7 @@ namespace XLBranchChooser
         {
             InitializeComponent();
         }
-        public static string exePath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\XIVLauncher\addon\Hooks\dev\Dalamud.Injector.exe";
+        public static string exePath = GetInjectorPath();
         public static string launcherjsonPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\XIVLauncher\launcherConfigV3.json";
         public static string GameVersion = "";
 
@@ -59,6 +60,76 @@ namespace XLBranchChooser
                 return jsonObj["GamePath"]?.ToString();
             }
         }
+        public static string GetInjectorPath()
+        {
+            string hooksPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                @"XIVLauncher\addon\Hooks"
+            );
+
+            if (!Directory.Exists(hooksPath))
+                return ""; 
+
+            // dev folder has priority
+            string devPath = Path.Combine(hooksPath, "dev", "Dalamud.Injector.exe");
+            if (File.Exists(devPath))
+                return devPath;
+
+         
+            var injectors = Directory.GetDirectories(hooksPath)
+                .Select(dir => Path.Combine(dir, "Dalamud.Injector.exe"))
+                .Where(File.Exists)
+                .Select(path => new FileInfo(path))
+                .OrderByDescending(fi => fi.LastWriteTime)
+                .ToList();
+
+            if (injectors.Count == 0)
+                return ""; 
+
+            return injectors.First().FullName;
+        }
+
+        public static bool IsDotNetRuntimeInstalled(string requiredVersion)
+        {
+            try
+            {
+                var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "dotnet",
+                        Arguments = "--list-runtimes",
+                        RedirectStandardOutput = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    }
+                };
+
+                process.Start();
+                string output = process.StandardOutput.ReadToEnd();
+                process.WaitForExit();
+
+                foreach (string line in output.Split('\n'))
+                {
+                    if (line.StartsWith("Microsoft.NETCore.App"))
+                    {
+                        var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                        if (parts.Length >= 2 && Version.TryParse(parts[1], out Version? ver))
+                        {
+                            if (ver >= Version.Parse(requiredVersion))
+                                return true;
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                return false;
+            }
+
+            return false;
+        }
+
 
         private void Form1_Load(object sender, EventArgs e)
         {
@@ -180,8 +251,42 @@ namespace XLBranchChooser
         {
             pictureBox.Image = XLBranchChooser.Properties.Resources.Scared_Hamster;
 
+            if (!IsDotNetRuntimeInstalled("10.0.0"))
+            {
+                var result = MessageBox.Show(
+                    "Кажется, что .NET Runtime 10.0.0 не установлен.\n" +
+                    "Инжект не запустится без его установки.\n\n" +
+                    "Открыть страницу загрузки?",
+                    "Нет .NET Runtime",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning
+                );
 
-            Process[] pname = Process.GetProcessesByName("ffxiv_dx11");
+                if (result == DialogResult.Yes)
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "https://aka.ms/dotnet-core-applaunch?framework=Microsoft.NETCore.App&framework_version=10.0.0",
+                        UseShellExecute = true
+                    });
+                    pictureBox.Image = XLBranchChooser.Properties.Resources.sad;
+                    return;
+                }
+
+            }
+
+            exePath = GetInjectorPath();
+            if (string.IsNullOrEmpty(exePath))
+            {
+                MessageBox.Show("Я не смог найти инжектор.. Даламуд не скачан?", "Ошибка :(");
+            }
+
+            JObject jsonObject = LoadJson();
+
+
+
+
+        Process[] pname = Process.GetProcessesByName("ffxiv_dx11");
             if (pname.Length == 0)
                 MessageBox.Show("Ты это, для инжекта саму финалку то запусти");
             else
